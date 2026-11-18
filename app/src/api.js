@@ -9,7 +9,9 @@ const API_HOST =
 export const API_URL =
   process.env.EXPO_PUBLIC_API_URL ||
   (Platform.OS === 'web' && typeof window !== 'undefined' && window.location
-    ? `${window.location.protocol}//${window.location.hostname}:4000/api`
+    ? (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? `${window.location.protocol}//${window.location.hostname}:4000/api`
+        : `${window.location.origin}/api`)
     : `http://${API_HOST}:4000/api`);
 
 let token = null;
