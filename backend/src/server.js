@@ -37,7 +37,11 @@ async function start() {
     console.error('MySQL init failed:', err.message);
     console.error('Check MySQL is running and DB_HOST/DB_USER/DB_PASSWORD/DB_NAME in backend/.env are correct.');
   }
-  app.listen(PORT, () => console.log(`EduStruc API running on http://localhost:${PORT}`));
+  if (!process.env.VERCEL) {
+    app.listen(PORT, () => console.log(`EduStruc API running on http://localhost:${PORT}`));
+  }
 }
 
 start();
+
+module.exports = app;
