@@ -1,9 +1,6 @@
 {
-  "name": "schoolcrm-root",
+  "name": "schoolcrm",
   "private": true,
-  "scripts": {
-    "build": "node build.js"
-  },
   "workspaces": [
     "app",
     "backend"
