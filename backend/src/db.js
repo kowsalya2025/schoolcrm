@@ -13,11 +13,98 @@ const baseConfig = {
 };
 
 let pool = null;
+const { supabase } = require('./supabase');
 
-// Stable wrapper so other modules can require { db } at load time,
-// while the underlying pool is created during init().
+async function querySupabase(sql, params = []) {
+  try {
+    const trimmed = sql.trim();
+    // 1. SELECT * FROM <table> WHERE email = ?
+    const emailMatch = trimmed.match(/SELECT \* FROM `?(\w+)`? WHERE email = \?/i);
+    if (emailMatch) {
+      const table = emailMatch[1];
+      const { data, error } = await supabase.from(table).select('*').eq('email', params[0]);
+      if (!error && data && data.length) return [data];
+    }
+
+    // 2. SELECT * FROM <table> WHERE id = ?
+    const idMatch = trimmed.match(/SELECT \* FROM `?(\w+)`? WHERE id = \?/i);
+    if (idMatch) {
+      const table = idMatch[1];
+      const { data, error } = await supabase.from(table).select('*').eq('id', params[0]);
+      if (!error && data && data.length) return [data];
+    }
+
+    // 3. SELECT * FROM <table> (with optional ORDER BY id DESC)
+    const selectAllMatch = trimmed.match(/SELECT \* FROM `?(\w+)`?(?: ORDER BY id (DESC|ASC))?/i);
+    if (selectAllMatch) {
+      const table = selectAllMatch[1];
+      const asc = (selectAllMatch[2] || '').toUpperCase() === 'ASC';
+      const { data, error } = await supabase.from(table).select('*').order('id', { ascending: asc });
+      if (!error && data) return [data];
+    }
+
+    // 4. SELECT COUNT(*) AS c FROM <table>
+    const countMatch = trimmed.match(/SELECT COUNT\(\*\) AS c FROM `?(\w+)`?/i);
+    if (countMatch) {
+      const table = countMatch[1];
+      const { count, error } = await supabase.from(table).select('*', { count: 'exact', head: true });
+      if (!error && count !== null) return [[{ c: count }]];
+    }
+
+    // 5. INSERT INTO <table> (...) VALUES (...)
+    const insertMatch = trimmed.match(/INSERT INTO `?(\w+)`?\s*\(([^)]+)\)\s*VALUES/i);
+    if (insertMatch) {
+      const table = insertMatch[1];
+      const cols = insertMatch[2].split(',').map((c) => c.replace(/[`\s]/g, ''));
+      const obj = {};
+      cols.forEach((col, i) => { obj[col] = params[i]; });
+      const { data, error } = await supabase.from(table).insert([obj]).select();
+      if (!error && data && data.length) {
+        return [{ insertId: data[0].id, affectedRows: 1 }];
+      }
+    }
+
+    // 6. UPDATE <table> SET ... WHERE id = ?
+    const updateMatch = trimmed.match(/UPDATE `?(\w+)`?\s*SET (.+) WHERE id = \?/i);
+    if (updateMatch) {
+      const table = updateMatch[1];
+      const id = params[params.length - 1];
+      const assignments = updateMatch[2].split(',');
+      const obj = {};
+      assignments.forEach((assignment, i) => {
+        const col = assignment.split('=')[0].replace(/[`\s]/g, '');
+        obj[col] = params[i];
+      });
+      const { data, error } = await supabase.from(table).update(obj).eq('id', id).select();
+      if (!error && data) {
+        return [{ affectedRows: data.length }];
+      }
+    }
+
+    // 7. DELETE FROM <table> WHERE id = ?
+    const deleteMatch = trimmed.match(/DELETE FROM `?(\w+)`? WHERE id = \?/i);
+    if (deleteMatch) {
+      const table = deleteMatch[1];
+      const id = params[0];
+      const { data, error } = await supabase.from(table).delete().eq('id', id).select();
+      if (!error) {
+        return [{ affectedRows: data ? data.length : 1 }];
+      }
+    }
+  } catch (err) {
+    // continue to fallback
+  }
+  return null;
+}
+
+// Stable wrapper so other modules can require { db } at load time
 const db = {
   query: async (sql, params = []) => {
+    // 1. Try Supabase cloud database
+    const sbResult = await querySupabase(sql, params);
+    if (sbResult) return sbResult;
+
+    // 2. Try MySQL local pool if active
     if (pool) {
       try {
         return await pool.query(sql, params);
@@ -25,6 +112,8 @@ const db = {
         console.warn('MySQL query error, using fallback:', err.message);
       }
     }
+
+    // 3. Fallback mock data
     if (/SELECT COUNT\(\*\)/i.test(sql)) return [[{ c: 2450 }]];
     if (/SELECT COALESCE\(SUM/i.test(sql)) return [[{ s: 14200 }]];
     return [[]];
