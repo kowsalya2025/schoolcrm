@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "EduStruc",
+    "slug": "edustruc",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "edustruc",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.edustruc.schoolcrm",
+      "adaptiveIcon": {
+        "backgroundColor": "#1E3A8A"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.edustruc.schoolcrm"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "splash": {
+      "backgroundColor": "#1E3A8A"
+    },
+    "plugins": [
+      "expo-status-bar"
+    ]
+  }
+}

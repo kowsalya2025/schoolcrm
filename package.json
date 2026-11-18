@@ -1,0 +1,8 @@
+{
+  "name": "schoolcrm-root",
+  "private": true,
+  "workspaces": [
+    "app",
+    "backend"
+  ]
+}
